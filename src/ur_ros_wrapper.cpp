@@ -48,6 +48,7 @@
 #include "ur_msgs/Digital.h"
 #include "ur_msgs/Analog.h"
 #include "std_msgs/String.h"
+#include "std_msgs/Float64MultiArray.h"
 #include <controller_manager/controller_manager.h>
 
 /// TF
@@ -67,6 +68,7 @@ protected:
 	control_msgs::FollowJointTrajectoryResult result_;
 	ros::Subscriber speed_sub_;
 	ros::Subscriber urscript_sub_;
+	ros::Subscriber servoj_sub_;
 	ros::ServiceServer io_srv_;
 	ros::ServiceServer payload_srv_;
 	std::thread* rt_publish_thread_;
@@ -207,6 +209,8 @@ public:
 					&RosWrapper::speedInterface, this);
 			urscript_sub_ = nh_.subscribe("ur_driver/URScript", 1,
 					&RosWrapper::urscriptInterface, this);
+			servoj_sub_ = nh_.subscribe("ur_driver/servoj", 1,
+					&RosWrapper::servojInterface, this);
 
 			io_srv_ = nh_.advertiseService("ur_driver/set_io",
 					&RosWrapper::setIO, this);
@@ -560,6 +564,14 @@ private:
 		robot_.rt_interface_->addCommandToQueue(msg->data);
 
 	}
+	void servojInterface(const std_msgs::Float64MultiArray::ConstPtr& msg) {
+            auto data = msg->data;
+            if (data.size() != 6) {
+                print_error("servoj takes 6 args");
+                return;
+            }
+            robot_.servoj(data);
+        }
 
 	void rosControlLoop() {
 		ros::Duration elapsed_time;

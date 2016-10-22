@@ -117,10 +117,14 @@ bool UrDriver::doTraj(std::vector<double> inp_timestamps,
 
 void UrDriver::servoj(std::vector<double> positions, int keepalive) {
 	if (!reverse_connected_) {
+            if (rt_interface_->connected_) {
+                uploadProg();
+            } else {
 		print_error(
 				"UrDriver::servoj called without a reverse connection present. Keepalive: "
 						+ std::to_string(keepalive));
 		return;
+            }
 	}
 	unsigned int bytes_written;
 	int tmp;
