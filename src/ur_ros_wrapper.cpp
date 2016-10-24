@@ -580,8 +580,11 @@ private:
 
   bool reopenConnection(ur_modern_driver::ResetConnection::Request  &req,
                         ur_modern_driver::ResetConnection::Response &res) {
+    ROS_WARN("Closing servo.");
     robot_.closeServo(std::vector<double>());
     robot_.openServo();
+    ROS_WARN("Reopening servo.");
+    return true;
   }
 
   void rosControlLoop() {
