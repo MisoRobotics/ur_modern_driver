@@ -48,6 +48,7 @@
 #include "ur_msgs/Digital.h"
 #include "ur_msgs/Analog.h"
 #include "std_msgs/String.h"
+#include "std_msgs/Bool.h"
 #include "std_msgs/Float64MultiArray.h"
 #include <controller_manager/controller_manager.h>
 
@@ -211,6 +212,8 @@ public:
 					&RosWrapper::urscriptInterface, this);
 			servoj_sub_ = nh_.subscribe("ur_driver/servoj", 1,
 					&RosWrapper::servojInterface, this);
+			servoj_sub_ = nh_.subscribe("ur_driver/reopen_connection", 1,
+					&RosWrapper::reopenConnection, this);
 
 			io_srv_ = nh_.advertiseService("ur_driver/set_io",
 					&RosWrapper::setIO, this);
@@ -571,6 +574,11 @@ private:
                 return;
             }
             robot_.servoj(data);
+        }
+
+	void reopenConnection(const std_msgs::Bool::ConstPtr& msg) {
+            robot_.closeServo(std::vector<double>());
+            robot_.openServo();
         }
 
 	void rosControlLoop() {
