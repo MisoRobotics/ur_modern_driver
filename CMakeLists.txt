@@ -51,6 +51,9 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * uncomment the generate_messages entry below
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
+find_package(message_generation)
+
+
 ## Generate messages in the 'msg' folder
 # add_message_files(
 #   FILES
@@ -59,11 +62,10 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+  FILES
+  ResetConnection.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -77,6 +79,11 @@ find_package(catkin REQUIRED COMPONENTS
 #   DEPENDENCIES
 #   control_msgs#   geometry_msgs#   sensor_msgs#   trajectory_msgs#   ur_msgs
 # )
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
