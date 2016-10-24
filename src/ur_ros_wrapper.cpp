@@ -28,6 +28,7 @@
 #include <cmath>
 #include <chrono>
 #include <time.h>
+#include <memory>
 
 #include "ros/ros.h"
 #include <ros/console.h>
@@ -73,7 +74,6 @@ protected:
   ros::Subscriber servoj_sub_;
   ros::ServiceServer io_srv_;
   ros::ServiceServer payload_srv_;
-  ros::ServiceServer reset_connection_srv_;
   std::thread* rt_publish_thread_;
   std::thread* mb_publish_thread_;
   double io_flag_delay_;
@@ -218,9 +218,6 @@ public:
                                      &RosWrapper::setIO, this);
       payload_srv_ = nh_.advertiseService("ur_driver/set_payload",
                                           &RosWrapper::setPayload, this);
-      reset_connection_srv_ = nh_.advertiseService("ur_driver/reset_connection",
-                                                   &RosWrapper::reopenConnection, this);
-
     }
   }
 
@@ -578,12 +575,6 @@ private:
     robot_.servoj(data);
   }
 
-  bool reopenConnection(ur_modern_driver::ResetConnection::Request  &req,
-                        ur_modern_driver::ResetConnection::Response &res) {
-    robot_.closeServo(std::vector<double>());
-    robot_.openServo();
-  }
-
   void rosControlLoop() {
     ros::Duration elapsed_time;
     struct timespec last_time, current_time;
@@ -756,7 +747,45 @@ private:
 
     }
   }
+};
 
+class reset_connection_service_host
+{
+  const std::string host_;
+  const int reverse_port_;
+  std::unique_ptr<RosWrapper> ros_wrapper_;
+  bool reset_connection()
+  {
+    ROS_WARN("Reinitializing servo connection.");
+    if (ros_wrapper_)
+      {
+        ros_wrapper_->halt();
+      }
+    ROS_WARN("RosWrapper halted.");
+    ros_wrapper_.reset(new RosWrapper(host_, reverse_port_));
+    ROS_WARN("Servo connection reopened.");
+    return true;
+  }
+
+public:
+  reset_connection_service_host(const std::string& host, int reverse_port)
+    : host_(host)
+    , reverse_port_(reverse_port)
+  {
+    reset_connection();
+  }
+
+  ~reset_connection_service_host()
+  {
+    if (ros_wrapper_)
+      ros_wrapper_->halt();
+  }
+
+  bool reopen_connection(ur_modern_driver::ResetConnectionRequest& req,
+                         ur_modern_driver::ResetConnectionResponse& res)
+  {
+    return reset_connection();
+  }
 };
 
 int main(int argc, char **argv) {
@@ -789,14 +818,15 @@ int main(int argc, char **argv) {
   } else
     reverse_port = 50001;
 
-  RosWrapper interface(host, reverse_port);
+  reset_connection_service_host reset_connection_host(host, reverse_port);
+  auto reset_connection_srv = nh.advertiseService("ur_driver/reset_connection",
+                                                  &reset_connection_service_host::reopen_connection,
+                                                  &reset_connection_host);
 
   ros::AsyncSpinner spinner(3);
   spinner.start();
 
   ros::waitForShutdown();
-
-  interface.halt();
 
   exit(0);
 }
