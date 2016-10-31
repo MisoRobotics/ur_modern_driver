@@ -20,10 +20,10 @@
 
 UrDriver::UrDriver(std::condition_variable& rt_msg_cond,
 		std::condition_variable& msg_cond, std::string host,
-		unsigned int reverse_port, double servoj_time,
+		double servoj_time,
 		unsigned int safety_count_max, double max_time_step, double min_payload,
 		double max_payload, double servoj_lookahead_time, double servoj_gain) :
-		REVERSE_PORT_(reverse_port), maximum_time_step_(max_time_step), minimum_payload_(
+		maximum_time_step_(max_time_step), minimum_payload_(
 				min_payload), maximum_payload_(max_payload), servoj_time_(
 				servoj_time), servoj_lookahead_time_(servoj_lookahead_time), servoj_gain_(servoj_gain) {
 	char buffer[256];
@@ -31,7 +31,6 @@ UrDriver::UrDriver(std::condition_variable& rt_msg_cond,
 	int n, flag;
 
 	firmware_version_ = 0;
-	reverse_connected_ = false;
 	executing_traj_ = false;
 	rt_interface_ = new UrRealtimeCommunication(rt_msg_cond, host,
 			safety_count_max);
@@ -43,19 +42,6 @@ UrDriver::UrDriver(std::condition_variable& rt_msg_cond,
 		print_fatal("ERROR opening socket for reverse communication");
 	}
 	bzero((char *) &serv_addr, sizeof(serv_addr));
-
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons(REVERSE_PORT_);
-	flag = 1;
-	setsockopt(incoming_sockfd_, IPPROTO_TCP, TCP_NODELAY, (char *) &flag,
-			sizeof(int));
-	setsockopt(incoming_sockfd_, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(int));
-	if (bind(incoming_sockfd_, (struct sockaddr *) &serv_addr,
-			sizeof(serv_addr)) < 0) {
-		print_fatal("ERROR on binding socket for reverse communication");
-	}
-	listen(incoming_sockfd_, 5);
 }
 
 std::vector<double> UrDriver::interp_cubic(double t, double T,
@@ -81,10 +67,6 @@ bool UrDriver::doTraj(std::vector<double> inp_timestamps,
 	std::chrono::high_resolution_clock::time_point t0, t;
 	std::vector<double> positions;
 	unsigned int j;
-
-	if (!UrDriver::uploadProg()) {
-		return false;
-	}
 	executing_traj_ = true;
 	t0 = std::chrono::high_resolution_clock::now();
 	t = t0;
@@ -111,37 +93,21 @@ bool UrDriver::doTraj(std::vector<double> inp_timestamps,
 	}
 	executing_traj_ = false;
 	//Signal robot to stop driverProg()
-	UrDriver::closeServo(positions);
+	//UrDriver::closeServo(positions);
+        rt_interface_->addCommandToQueue("stopj(10)\n");
 	return true;
 }
 
-void UrDriver::servoj(std::vector<double> positions, int keepalive) {
-	if (!reverse_connected_) {
-            if (rt_interface_->connected_) {
-                uploadProg();
-            } else {
-		print_error(
-				"UrDriver::servoj called without a reverse connection present. Keepalive: "
-						+ std::to_string(keepalive));
-		return;
-            }
-	}
-	unsigned int bytes_written;
-	int tmp;
-	unsigned char buf[28];
-	for (int i = 0; i < 6; i++) {
-		tmp = htonl((int) (positions[i] * MULT_JOINTSTATE_));
-		buf[i * 4] = tmp & 0xff;
-		buf[i * 4 + 1] = (tmp >> 8) & 0xff;
-		buf[i * 4 + 2] = (tmp >> 16) & 0xff;
-		buf[i * 4 + 3] = (tmp >> 24) & 0xff;
-	}
-	tmp = htonl((int) keepalive);
-	buf[6 * 4] = tmp & 0xff;
-	buf[6 * 4 + 1] = (tmp >> 8) & 0xff;
-	buf[6 * 4 + 2] = (tmp >> 16) & 0xff;
-	buf[6 * 4 + 3] = (tmp >> 24) & 0xff;
-	bytes_written = write(new_sockfd_, buf, 28);
+void UrDriver::servoj(std::vector<double> positions, int /*keepalive*/) {
+    char buf[1024];
+    snprintf(buf,sizeof(buf), "servoj([%.6f,%.6f,%.6f,%.6f,%.6f,%.6f], 0, 0, 0.008, lookahead_time=0.1, gain=300)\n", 
+			      positions[0],
+			      positions[1],
+			      positions[2],
+			      positions[3],
+			      positions[4],
+			      positions[5]);
+    rt_interface_->addCommandToQueue(buf);
 }
 
 void UrDriver::stopTraj() {
@@ -149,105 +115,8 @@ void UrDriver::stopTraj() {
 	rt_interface_->addCommandToQueue("stopj(10)\n");
 }
 
-bool UrDriver::uploadProg() {
-	std::string cmd_str;
-	char buf[128];
-	cmd_str = "def driverProg():\n";
 
-	sprintf(buf, "\tMULT_jointstate = %i\n", MULT_JOINTSTATE_);
-	cmd_str += buf;
 
-	cmd_str += "\tSERVO_IDLE = 0\n";
-	cmd_str += "\tSERVO_RUNNING = 1\n";
-	cmd_str += "\tcmd_servo_state = SERVO_IDLE\n";
-	cmd_str += "\tcmd_servo_q = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n";
-	cmd_str += "\tdef set_servo_setpoint(q):\n";
-	cmd_str += "\t\tenter_critical\n";
-	cmd_str += "\t\tcmd_servo_state = SERVO_RUNNING\n";
-	cmd_str += "\t\tcmd_servo_q = q\n";
-	cmd_str += "\t\texit_critical\n";
-	cmd_str += "\tend\n";
-	cmd_str += "\tthread servoThread():\n";
-	cmd_str += "\t\tstate = SERVO_IDLE\n";
-	cmd_str += "\t\twhile True:\n";
-	cmd_str += "\t\t\tenter_critical\n";
-	cmd_str += "\t\t\tq = cmd_servo_q\n";
-	cmd_str += "\t\t\tdo_brake = False\n";
-	cmd_str += "\t\t\tif (state == SERVO_RUNNING) and ";
-	cmd_str += "(cmd_servo_state == SERVO_IDLE):\n";
-	cmd_str += "\t\t\t\tdo_brake = True\n";
-	cmd_str += "\t\t\tend\n";
-	cmd_str += "\t\t\tstate = cmd_servo_state\n";
-	cmd_str += "\t\t\tcmd_servo_state = SERVO_IDLE\n";
-	cmd_str += "\t\t\texit_critical\n";
-	cmd_str += "\t\t\tif do_brake:\n";
-	cmd_str += "\t\t\t\tstopj(1.0)\n";
-	cmd_str += "\t\t\t\tsync()\n";
-	cmd_str += "\t\t\telif state == SERVO_RUNNING:\n";
-
-	if (sec_interface_->robot_state_->getVersion() >= 3.1)
-		sprintf(buf, "\t\t\t\tservoj(q, t=%.4f, lookahead_time=%.4f, gain=%.0f)\n",
-				servoj_time_, servoj_lookahead_time_, servoj_gain_);
-	else
-		sprintf(buf, "\t\t\t\tservoj(q, t=%.4f)\n", servoj_time_);
-	cmd_str += buf;
-
-	cmd_str += "\t\t\telse:\n";
-	cmd_str += "\t\t\t\tsync()\n";
-	cmd_str += "\t\t\tend\n";
-	cmd_str += "\t\tend\n";
-	cmd_str += "\tend\n";
-
-	sprintf(buf, "\tsocket_open(\"%s\", %i)\n", ip_addr_.c_str(),
-			REVERSE_PORT_);
-	cmd_str += buf;
-
-	cmd_str += "\tthread_servo = run servoThread()\n";
-	cmd_str += "\tkeepalive = 1\n";
-	cmd_str += "\twhile keepalive > 0:\n";
-	cmd_str += "\t\tparams_mult = socket_read_binary_integer(6+1)\n";
-	cmd_str += "\t\tif params_mult[0] > 0:\n";
-	cmd_str += "\t\t\tq = [params_mult[1] / MULT_jointstate, ";
-	cmd_str += "params_mult[2] / MULT_jointstate, ";
-	cmd_str += "params_mult[3] / MULT_jointstate, ";
-	cmd_str += "params_mult[4] / MULT_jointstate, ";
-	cmd_str += "params_mult[5] / MULT_jointstate, ";
-	cmd_str += "params_mult[6] / MULT_jointstate]\n";
-	cmd_str += "\t\t\tkeepalive = params_mult[7]\n";
-	cmd_str += "\t\t\tset_servo_setpoint(q)\n";
-	cmd_str += "\t\tend\n";
-	cmd_str += "\tend\n";
-	cmd_str += "\tsleep(.1)\n";
-	cmd_str += "\tsocket_close()\n";
-	cmd_str += "\tkill thread_servo\n";
-	cmd_str += "end\n";
-
-	rt_interface_->addCommandToQueue(cmd_str);
-	return UrDriver::openServo();
-}
-
-bool UrDriver::openServo() {
-	struct sockaddr_in cli_addr;
-	socklen_t clilen;
-	clilen = sizeof(cli_addr);
-	new_sockfd_ = accept(incoming_sockfd_, (struct sockaddr *) &cli_addr,
-			&clilen);
-	if (new_sockfd_ < 0) {
-		print_fatal("ERROR on accepting reverse communication");
-		return false;
-	}
-	reverse_connected_ = true;
-	return true;
-}
-void UrDriver::closeServo(std::vector<double> positions) {
-	if (positions.size() != 6)
-		UrDriver::servoj(rt_interface_->robot_state_->getQActual(), 0);
-	else
-		UrDriver::servoj(positions, 0);
-
-	reverse_connected_ = false;
-	close(new_sockfd_);
-}
 
 bool UrDriver::start() {
 	if (!sec_interface_->start())
@@ -256,12 +125,7 @@ bool UrDriver::start() {
 	rt_interface_->robot_state_->setVersion(firmware_version_);
 	if (!rt_interface_->start())
 		return false;
-	ip_addr_ = rt_interface_->getLocalIp();
-	print_debug(
-			"Listening on " + ip_addr_ + ":" + std::to_string(REVERSE_PORT_)
-					+ "\n");
 	return true;
-
 }
 
 void UrDriver::halt() {

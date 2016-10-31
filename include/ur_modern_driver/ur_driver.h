@@ -43,10 +43,8 @@ private:
 	std::string ip_addr_;
 	const int MULT_JOINTSTATE_ = 1000000;
 	const int MULT_TIME_ = 1000000;
-	const unsigned int REVERSE_PORT_;
 	int incoming_sockfd_;
 	int new_sockfd_;
-	bool reverse_connected_;
 	double servoj_time_;
 	bool executing_traj_;
 	double firmware_version_;
@@ -58,7 +56,7 @@ public:
 
 	UrDriver(std::condition_variable& rt_msg_cond,
 			std::condition_variable& msg_cond, std::string host,
-			unsigned int reverse_port = 50007, double servoj_time = 0.016, unsigned int safety_count_max =
+			double servoj_time = 0.016, unsigned int safety_count_max =
 					12, double max_time_step = 0.08, double min_payload = 0.,
 			double max_payload = 1., double servoj_lookahead_time=0.03, double servoj_gain=300.);
 	bool start();

@@ -257,7 +257,7 @@ void UrHardwareInterface::doSwitch(
 				== "hardware_interface::PositionJointInterface") {
 			position_interface_running_ = false;
 			std::vector<double> tmp;
-			robot_->closeServo(tmp);
+			//robot_->closeServo(tmp);
 			ROS_DEBUG("Stopping position interface");
 		}
 	}
@@ -272,7 +272,7 @@ void UrHardwareInterface::doSwitch(
 		if (controller_it->hardware_interface
 				== "hardware_interface::PositionJointInterface") {
 			position_interface_running_ = true;
-			robot_->uploadProg();
+			//robot_->uploadProg();
 			ROS_DEBUG("Starting position interface");
 		}
 	}
