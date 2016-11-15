@@ -615,10 +615,8 @@ private:
   }
 
   void publishRTMsg() {
-    ros::Publisher joint_pub = nh_.advertise<sensor_msgs::JointState>(
-                                                                      "joint_states", 1);
-    ros::Publisher wrench_pub = nh_.advertise<geometry_msgs::WrenchStamped>(
-                                                                            "wrench", 1);
+    ros::Publisher joint_pub = nh_.advertise<sensor_msgs::JointState>("/ur_modern_driver/joint_states", 1);
+    ros::Publisher wrench_pub = nh_.advertise<geometry_msgs::WrenchStamped>("wrench", 1);
     ros::Publisher tool_vel_pub = nh_.advertise<geometry_msgs::TwistStamped>("tool_velocity", 1);
     static tf::TransformBroadcaster br;
     while (ros::ok()) {

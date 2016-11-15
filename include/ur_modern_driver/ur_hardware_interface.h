@@ -53,7 +53,7 @@
  *********************************************************************
 
  Author: Dave Coleman
- */
+*/
 
 #ifndef UR_ROS_CONTROL_UR_HARDWARE_INTERFACE_H
 #define UR_ROS_CONTROL_UR_HARDWARE_INTERFACE_H
@@ -65,74 +65,86 @@
 #include <controller_manager/controller_manager.h>
 #include <boost/scoped_ptr.hpp>
 #include <ros/ros.h>
+#include <sensor_msgs/JointState.h>
 #include <math.h>
 #include "do_output.h"
 #include "ur_driver.h"
 
 namespace ros_control_ur {
 
-// For simulation only - determines how fast a trajectory is followed
-static const double POSITION_STEP_FACTOR = 1;
-static const double VELOCITY_STEP_FACTOR = 1;
+  // For simulation only - determines how fast a trajectory is followed
+  static const double POSITION_STEP_FACTOR = 1;
+  static const double VELOCITY_STEP_FACTOR = 1;
 
-/// \brief Hardware interface for a robot
-class UrHardwareInterface: public hardware_interface::RobotHW {
-public:
+  /// \brief Hardware interface for a robot
+  class UrHardwareInterface: public hardware_interface::RobotHW
+  {
+    void handle_robotiq_update(const sensor_msgs::JointState::ConstPtr &msg);
 
-	/**
-	 * \brief Constructor
-	 * \param nh - Node handle for topics.
-	 */
-	UrHardwareInterface(ros::NodeHandle& nh, UrDriver* robot);
+  public:
 
-	/// \brief Initialize the hardware interface
-	virtual void init();
+    /**
+     * \brief Constructor
+     * \param nh - Node handle for topics.
+     */
+    UrHardwareInterface(ros::NodeHandle& nh, UrDriver* robot);
 
-	/// \brief Read the state from the robot hardware.
-	virtual void read();
+    /// \brief Initialize the hardware interface
+    virtual void init();
 
-	/// \brief write the command to the robot hardware.
-	virtual void write();
+    /// \brief Read the state from the robot hardware.
+    virtual void read();
 
-	void setMaxVelChange(double inp);
+    /// \brief write the command to the robot hardware.
+    virtual void write();
 
-	bool canSwitch(
-			const std::list<hardware_interface::ControllerInfo> &start_list,
-			const std::list<hardware_interface::ControllerInfo> &stop_list) const;
-	void doSwitch(const std::list<hardware_interface::ControllerInfo>&start_list,
-			const std::list<hardware_interface::ControllerInfo>&stop_list);
+    void setMaxVelChange(double inp);
 
-protected:
+    bool canSwitch(
+                   const std::list<hardware_interface::ControllerInfo> &start_list,
+                   const std::list<hardware_interface::ControllerInfo> &stop_list) const;
+    void doSwitch(const std::list<hardware_interface::ControllerInfo>&start_list,
+                  const std::list<hardware_interface::ControllerInfo>&stop_list);
 
-	// Startup and shutdown of the internal node inside a roscpp program
-	ros::NodeHandle nh_;
+  protected:
 
-	// Interfaces
-	hardware_interface::JointStateInterface joint_state_interface_;
-	hardware_interface::ForceTorqueSensorInterface force_torque_interface_;
-	hardware_interface::PositionJointInterface position_joint_interface_;
-	hardware_interface::VelocityJointInterface velocity_joint_interface_;
-	bool velocity_interface_running_;
-	bool position_interface_running_;
-	// Shared memory
-	std::vector<std::string> joint_names_;
-	std::vector<double> joint_position_;
-	std::vector<double> joint_velocity_;
-	std::vector<double> joint_effort_;
-	std::vector<double> joint_position_command_;
-	std::vector<double> joint_velocity_command_;
-	std::vector<double> prev_joint_velocity_command_;
-		std::size_t num_joints_;
-	double robot_force_[3] = { 0., 0., 0. };
-	double robot_torque_[3] = { 0., 0., 0. };
+    // Startup and shutdown of the internal node inside a roscpp program
+    ros::NodeHandle nh_;
 
-	double max_vel_change_;
+    // Interfaces
+    hardware_interface::JointStateInterface joint_state_interface_;
+    hardware_interface::ForceTorqueSensorInterface force_torque_interface_;
+    hardware_interface::PositionJointInterface position_joint_interface_;
+    hardware_interface::VelocityJointInterface velocity_joint_interface_;
+    bool velocity_interface_running_;
+    bool position_interface_running_;
+    // Shared memory
+    std::vector<std::string> joint_names_;
+    std::vector<double> joint_position_;
+    std::vector<double> joint_velocity_;
+    std::vector<double> joint_effort_;
+    std::vector<double> joint_position_command_;
+    std::vector<double> joint_velocity_command_;
+    std::vector<double> prev_joint_velocity_command_;
+    std::size_t num_joints_;
+    double robot_force_[3] = { 0., 0., 0. };
+    double robot_torque_[3] = { 0., 0., 0. };
 
-	// Robot API
-	UrDriver* robot_;
+    double max_vel_change_;
 
-};
-// class
+    size_t gripper_index_;
+    double gripper_position_;
+    double gripper_velocity_;
+    double gripper_effort_;
+    ros::Subscriber gripper_sub_;
+
+    // Robot API
+    UrDriver* robot_;
+
+    std::mutex lock_;
+
+  };
+  // class
 
 }// namespace
 
