@@ -55,10 +55,15 @@ public:
 	UrCommunication* sec_interface_;
 
 	UrDriver(std::condition_variable& rt_msg_cond,
-			std::condition_variable& msg_cond, std::string host,
-			double servoj_time = 0.016, unsigned int safety_count_max =
-					12, double max_time_step = 0.08, double min_payload = 0.,
-			double max_payload = 1., double servoj_lookahead_time=0.03, double servoj_gain=300.);
+           std::condition_variable& msg_cond,
+           std::string host,
+           double servoj_time = 0.016,
+           unsigned int safety_count_max = 12,
+           double max_time_step = 0.08,
+           double min_payload = 0.,
+           double max_payload = 1.,
+           double servoj_lookahead_time=0.03,
+           double servoj_gain=300.);
 	bool start();
 	void halt();
 
