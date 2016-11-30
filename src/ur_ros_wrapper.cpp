@@ -613,7 +613,7 @@ private:
 
   void publish_wrench(ros::Time now)
   {
-    static auto wrench_pub = nh_.advertise<geometry_msgs::WrenchStamped>("wrench", 1);
+    static auto wrench_pub = nh_.advertise<geometry_msgs::WrenchStamped>("/ur_modern_driver/wrench", 1);
     // Publish TCP wrench
     geometry_msgs::WrenchStamped wrench_msg;
     auto tcp_force = robot_.rt_interface_->robot_state_->getTcpForce();
@@ -630,7 +630,7 @@ private:
 
   void publish_tool_velocity(ros::Time now)
   {
-    static auto tool_vel_pub = nh_.advertise<geometry_msgs::TwistStamped>("tool_velocity", 1);
+    static auto tool_vel_pub = nh_.advertise<geometry_msgs::TwistStamped>("/ur_modern_driver/tool_velocity", 1);
     auto tcp_speed = robot_.rt_interface_->robot_state_->getTcpSpeedActual();
     geometry_msgs::TwistStamped tool_twist;
     tool_twist.header.frame_id = base_frame_;
