@@ -81,6 +81,7 @@ protected:
   std::vector<double> joint_offsets_;
   std::string base_frame_;
   std::string tool_frame_;
+  std::string wrench_frame_;
   bool use_ros_control_;
   std::thread* ros_control_thread_;
   boost::shared_ptr<ros_control_ur::UrHardwareInterface> hardware_interface_;
@@ -177,6 +178,7 @@ public:
     //Base and tool frames
     base_frame_ = joint_prefix + "base";
     tool_frame_ =  joint_prefix + "tool0_controller";
+    wrench_frame_ = joint_prefix + "tool0_wrench";
     if (ros::param::get("~base_frame", base_frame_)) {
       sprintf(buf, "Base frame set to: %s", base_frame_.c_str());
       print_debug(buf);
@@ -619,7 +621,7 @@ private:
     geometry_msgs::WrenchStamped wrench_msg;
     auto tcp_force = robot_.rt_interface_->robot_state_->getTcpForce();
     wrench_msg.header.stamp = now;
-    wrench_msg.header.frame_id = base_frame_;
+    wrench_msg.header.frame_id = wrench_frame_;
     wrench_msg.wrench.force.x = tcp_force[0];
     wrench_msg.wrench.force.y = tcp_force[1];
     wrench_msg.wrench.force.z = tcp_force[2];
@@ -653,7 +655,7 @@ private:
     auto tcp = robot_.rt_interface_->robot_state_->getToolVectorActual();
     const tf::Vector3 tcp_x(tcp[0], tcp[1], tcp[2]);
     tf::StampedTransform stf_world(tf::Transform(tf::Quaternion(0, 0, 0, 1), tcp_x),
-                                   now, base_frame_, "tool_world");
+                                   now, base_frame_, wrench_frame_);
     br.sendTransform(stf_world);
 
     tf::Quaternion tcp_q;
