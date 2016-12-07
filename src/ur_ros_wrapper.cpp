@@ -81,6 +81,7 @@ protected:
   std::vector<double> joint_offsets_;
   std::string base_frame_;
   std::string tool_frame_;
+  std::string wrench_frame_;
   bool use_ros_control_;
   std::thread* ros_control_thread_;
   boost::shared_ptr<ros_control_ur::UrHardwareInterface> hardware_interface_;
@@ -175,8 +176,9 @@ public:
     robot_.setServojGain(servoj_gain);
 
     //Base and tool frames
-    base_frame_ = joint_prefix + "base_link";
+    base_frame_ = joint_prefix + "base";
     tool_frame_ =  joint_prefix + "tool0_controller";
+    wrench_frame_ = joint_prefix + "tool0_wrench";
     if (ros::param::get("~base_frame", base_frame_)) {
       sprintf(buf, "Base frame set to: %s", base_frame_.c_str());
       print_debug(buf);
@@ -598,6 +600,7 @@ private:
       robot_.rt_interface_->robot_state_->setControllerUpdated();
 
       publish_wrench(now);
+      publish_transforms(now);
       publish_tool_velocity(now);
 
       // Control
@@ -618,7 +621,7 @@ private:
     geometry_msgs::WrenchStamped wrench_msg;
     auto tcp_force = robot_.rt_interface_->robot_state_->getTcpForce();
     wrench_msg.header.stamp = now;
-    wrench_msg.header.frame_id = "tool0";
+    wrench_msg.header.frame_id = wrench_frame_;
     wrench_msg.wrench.force.x = tcp_force[0];
     wrench_msg.wrench.force.y = tcp_force[1];
     wrench_msg.wrench.force.z = tcp_force[2];
@@ -642,6 +645,30 @@ private:
     tool_twist.twist.angular.y = tcp_speed[4];
     tool_twist.twist.angular.z = tcp_speed[5];
     tool_vel_pub.publish(tool_twist);
+  }
+
+  void publish_transforms(ros::Time now) {
+    static tf::TransformBroadcaster br;
+    // Publish a transform that is aligned with base_frame_ BUT cenetered at the tool control point.
+    // This is needed because the output of the wrench seemms to be aligned to the world frame and is
+    // presumably measured at the tool control point (see URScript spec).
+    auto tcp = robot_.rt_interface_->robot_state_->getToolVectorActual();
+    const tf::Vector3 tcp_x(tcp[0], tcp[1], tcp[2]);
+    tf::StampedTransform stf_world(tf::Transform(tf::Quaternion(0, 0, 0, 1), tcp_x),
+                                   now, base_frame_, wrench_frame_);
+    br.sendTransform(stf_world);
+
+    tf::Quaternion tcp_q;
+    double rx = tcp[3];
+    double ry = tcp[4];
+    double rz = tcp[5];
+    double angle = std::sqrt(std::pow(rx,2) + std::pow(ry,2) + std::pow(rz,2));
+    if (angle < 1e-16)
+      tcp_q.setValue(0, 0, 0, 1);
+    else
+      tcp_q.setRotation(tf::Vector3(rx/angle, ry/angle, rz/angle), angle);
+    tf::StampedTransform stf_tool(tf::Transform(tcp_q, tcp_x), now, base_frame_, tool_frame_);
+    br.sendTransform(stf_tool);
   }
 
   void publishRTMsg() {
@@ -668,30 +695,8 @@ private:
       joint_pub.publish(joint_msg);
 
       publish_wrench(now);
-
-      // Tool vector: Actual Cartesian coordinates of the tool: (x,y,z,rx,ry,rz), where
-      // rx, ry and rz is a rotation vector representation of the tool orientation
-      std::vector<double> tool_vector_actual = robot_.rt_interface_->robot_state_->getToolVectorActual();
-
-      //Create quaternion
-      tf::Quaternion quat;
-      double rx = tool_vector_actual[3];
-      double ry = tool_vector_actual[4];
-      double rz = tool_vector_actual[5];
-      double angle = std::sqrt(std::pow(rx,2) + std::pow(ry,2) + std::pow(rz,2));
-      if (angle < 1e-16)
-        quat.setValue(0, 0, 0, 1);
-      else
-        quat.setRotation(tf::Vector3(rx/angle, ry/angle, rz/angle), angle);
-
-      //Create and broadcast transform
-      tf::Transform transform;
-      transform.setOrigin(tf::Vector3(tool_vector_actual[0], tool_vector_actual[1], tool_vector_actual[2]));
-      transform.setRotation(quat);
-      br.sendTransform(tf::StampedTransform(transform, joint_msg.header.stamp, base_frame_, tool_frame_));
-
+      publish_transforms(now);
       publish_tool_velocity(now);
-
       robot_.rt_interface_->robot_state_->setDataPublished();
     }
   }
