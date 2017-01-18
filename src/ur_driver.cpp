@@ -100,14 +100,14 @@ bool UrDriver::doTraj(std::vector<double> inp_timestamps,
 
 void UrDriver::servoj(std::vector<double> positions, int /*keepalive*/) {
     char buf[1024];
-    snprintf(buf,sizeof(buf), "servoj([%.6f,%.6f,%.6f,%.6f,%.6f,%.6f], 0, 0, 0.008, lookahead_time=0.2, gain=300)\n", 
-			      positions[0],
-			      positions[1],
-			      positions[2],
-			      positions[3],
-			      positions[4],
-			      positions[5]);
-    ROS_INFO_STREAM(buf);
+    snprintf(buf, sizeof(buf), "servoj([%.6f,%.6f,%.6f,%.6f,%.6f,%.6f], 0, 0, 0.008, lookahead_time=0.1, gain=300)\n",
+             positions[0],
+             positions[1],
+             positions[2],
+             positions[3],
+             positions[4],
+             positions[5]);
+    ROS_DEBUG_STREAM(buf);
     rt_interface_->addCommandToQueue(buf);
 }
 

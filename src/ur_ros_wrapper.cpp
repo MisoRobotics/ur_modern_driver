@@ -779,7 +779,7 @@ int main(int argc, char **argv) {
 
   ros::init(argc, argv, "ur_driver");
   ros::NodeHandle nh;
-  if (ros::param::get("use_sim_time", use_sim_time)) {
+  if (ros::param::get("use_sim_time", use_sim_time) && use_sim_time) {
     print_warning("use_sim_time is set!!");
   }
   if (!(ros::param::get("~robot_ip_address", host))) {
