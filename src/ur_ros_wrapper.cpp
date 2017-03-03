@@ -178,7 +178,7 @@ public:
     robot_.setServojGain(servoj_gain);
 
     //Base and tool frames
-    base_frame_ = joint_prefix + "base_link";
+    base_frame_ = joint_prefix + "base";
     tool_frame_ =  joint_prefix + "tool0_controller";
     if (ros::param::get("~base_frame", base_frame_)) {
       sprintf(buf, "Base frame set to: %s", base_frame_.c_str());
