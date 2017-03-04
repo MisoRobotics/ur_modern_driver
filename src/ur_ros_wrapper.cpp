@@ -179,14 +179,13 @@ public:
     base_frame_ = joint_prefix + "base";
     tool_frame_ =  joint_prefix + "tool0_controller";
     wrench_frame_ = joint_prefix + "tool0_wrench";
-    if (ros::param::get("~base_frame", base_frame_)) {
-      sprintf(buf, "Base frame set to: %s", base_frame_.c_str());
-      print_debug(buf);
-    }
-    if (ros::param::get("~tool_frame", tool_frame_)) {
-      sprintf(buf, "Tool frame set to: %s", tool_frame_.c_str());
-      print_debug(buf);
-    }
+    ros::param::get("~base_frame", base_frame_);
+    sprintf(buf, "Base frame set to: %s", base_frame_.c_str());
+    print_info(buf);
+
+    ros::param::get("~tool_frame", tool_frame_);
+    sprintf(buf, "Tool frame set to: %s", tool_frame_.c_str());
+    print_info(buf);
 
     if (robot_.start()) {
       if (use_ros_control_) {
