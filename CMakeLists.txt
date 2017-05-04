@@ -74,3 +74,37 @@ install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
   FILES_MATCHING PATTERN "*.h"
 )
+
+## Add all the files to CMake for qtcreator
+function(miso_add_custom_files_helper glob_pattern target_name)
+  FILE(GLOB_RECURSE target_files ${glob_pattern})
+  add_custom_target(${target_name} SOURCES ${target_files})
+endfunction(miso_add_custom_files_helper)
+
+function(miso_add_custom_files glob_pattern type)
+  miso_add_custom_files_helper(${glob_pattern} ${PROJECT_NAME}_${type})
+endfunction(miso_add_custom_files)
+
+function(miso_add_config_files)
+  miso_add_custom_files("config/*" config_files)
+endfunction(miso_add_config_files)
+
+function(miso_add_headers)
+  miso_add_custom_files("include/*.h*" headers)
+endfunction(miso_add_headers)
+
+function(miso_add_launch_files)
+  miso_add_custom_files("launch/*.launch" launch_files)
+endfunction(miso_add_launch_files)
+
+function(miso_add_scripts)
+  miso_add_custom_files("scripts/*" scripts)
+endfunction(miso_add_scripts)
+
+function(miso_add_ros_files)
+  miso_add_config_files()
+  miso_add_headers()
+  miso_add_launch_files()
+endfunction(miso_add_ros_files)
+
+miso_add_ros_files()
